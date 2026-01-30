@@ -32,16 +32,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-      steps:
-        - uses: actions/checkout@v4
-        - name: Install Rust
-          uses: dtolnay/rust-toolchain@stable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-        - name: Rust Cache
-          uses: Swatinem/rust-cache@v2
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
-        - name: Build & Run Tests
-          run: cargo test --verbose
+      - name: Build & Run Tests
+        run: cargo test --verbose
 
   audit:
     name: Security audit
