@@ -32,7 +32,10 @@ impl App {
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if !self.flights.is_empty() {
-                    self.selected_index = self.selected_index.checked_sub(1).unwrap_or(self.flights.len() - 1);
+                    self.selected_index = self
+                        .selected_index
+                        .checked_sub(1)
+                        .unwrap_or(self.flights.len() - 1);
                 }
             }
             _ => {}

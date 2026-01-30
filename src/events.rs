@@ -1,7 +1,7 @@
+use crate::models::Flight;
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
-use crate::models::Flight;
 
 pub enum Event {
     Tick,
@@ -23,7 +23,9 @@ impl EventHandler {
             let tick_rate = Duration::from_millis(tick_rate_ms);
             let mut last_tick = Instant::now();
             loop {
-                let timeout = tick_rate.checked_sub(last_tick.elapsed()).unwrap_or(Duration::from_secs(0));
+                let timeout = tick_rate
+                    .checked_sub(last_tick.elapsed())
+                    .unwrap_or(Duration::from_secs(0));
                 if event::poll(timeout).expect("Poll failed") {
                     if let CrosstermEvent::Key(key) = event::read().expect("Read failed") {
                         event_tx.send(Event::Input(key)).ok();

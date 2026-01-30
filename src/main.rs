@@ -1,9 +1,13 @@
 use color_eyre::Result;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use redwood_tui::{
+    api::FlightProvider,
+    app::App,
+    events::{Event, EventHandler},
+    logging, ui,
+};
 use std::{io, time::Duration};
-use redwood_tui::{api::FlightProvider, app::App, events::{Event, EventHandler}, ui, logging};
-use tracing::{info, error, debug};
-
+use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,12 +16,11 @@ async fn main() -> Result<()> {
     install_panic_hook();
     color_eyre::install()?;
 
-
     // Ready terminal and state
     let mut terminal = setup_terminal()?;
     let mut app = App::new();
     let events = EventHandler::new(150); // High tick rate for smooth animation
-    
+
     // Background API Poller
     let api_tx = events.tx.clone();
     tokio::spawn(async move {
@@ -52,13 +55,21 @@ async fn main() -> Result<()> {
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
-    crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen, crossterm::cursor::Hide)?;
+    crossterm::execute!(
+        stdout,
+        crossterm::terminal::EnterAlternateScreen,
+        crossterm::cursor::Hide
+    )?;
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
 }
 
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     crossterm::terminal::disable_raw_mode()?;
-    crossterm::execute!(terminal.backend_mut(), crossterm::terminal::LeaveAlternateScreen, crossterm::cursor::Show)?;
+    crossterm::execute!(
+        terminal.backend_mut(),
+        crossterm::terminal::LeaveAlternateScreen,
+        crossterm::cursor::Show
+    )?;
     Ok(())
 }
 
@@ -67,7 +78,12 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
         // Force terminal cleanup!
         crossterm::terminal::disable_raw_mode().ok();
-        crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen, crossterm::cursor::Show).ok();
+        crossterm::execute!(
+            std::io::stdout(),
+            crossterm::terminal::LeaveAlternateScreen,
+            crossterm::cursor::Show
+        )
+        .ok();
         original_hook(panic_info);
     }));
 }
