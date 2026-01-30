@@ -6,6 +6,12 @@ pub struct FlightProvider {
     client: Client,
 }
 
+impl Default for FlightProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlightProvider {
     pub fn new() -> Self {
         Self {

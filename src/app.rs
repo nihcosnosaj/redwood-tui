@@ -1,6 +1,7 @@
 use crate::models::Flight;
 use crossterm::event::{KeyCode, KeyEvent};
 
+#[derive(Default)]
 pub struct App {
     pub flights: Vec<Flight>,
     pub selected_index: usize,
@@ -10,12 +11,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        Self {
-            flights: Vec::new(),
-            selected_index: 0,
-            tick_count: 0,
-            should_quit: false,
-        }
+        Self::default()
     }
 
     pub fn on_tick(&mut self) {
