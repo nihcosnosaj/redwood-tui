@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, time::Duration};
-use redwood_tui::{api::FlightProvider, app::App, events::{Event, EventHandler}, ui};
+use redwood_tui::{api::FlightProvider, app::App, events::{Event, EventHandler}, ui, logging};
 use tracing::{info, error, debug};
 
 
