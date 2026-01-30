@@ -7,7 +7,7 @@ use redwood_tui::{
     logging, ui,
 };
 use std::{io, time::Duration};
-use tracing::{info};
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
