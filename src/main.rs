@@ -7,7 +7,7 @@ use redwood_tui::{
     logging, ui,
 };
 use std::{io, time::Duration};
-use tracing::{debug, error, info};
+use tracing::{info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,6 +15,8 @@ async fn main() -> Result<()> {
     let _log_guard = logging::initialize_logging();
     install_panic_hook();
     color_eyre::install()?;
+
+    info!("Redwood TUI starting up...");
 
     // Ready terminal and state
     let mut terminal = setup_terminal()?;
@@ -49,6 +51,7 @@ async fn main() -> Result<()> {
     }
 
     restore_terminal(terminal)?;
+    info!("Redwood TUI shutting down.");
     Ok(())
 }
 

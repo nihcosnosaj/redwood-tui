@@ -30,5 +30,5 @@ codegen-units = 1
 panic = 'abort'
 
 # Path to avoid "Edition 2024". Need to fix later
-[path.crates-io]
+[patch.crates-io]
 time = { git = "https://github.com/time-rs/time", tag = "v0.3.36"}
