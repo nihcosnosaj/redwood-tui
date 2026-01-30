@@ -4,7 +4,9 @@ use redwood_tui::{
     api::FlightProvider,
     app::App,
     events::{Event, EventHandler},
-    logging, ui,
+    logging,
+    models::load_aircraft_csv,
+    ui,
 };
 use std::{io, time::Duration};
 use tracing::info;
@@ -23,13 +25,21 @@ async fn main() -> Result<()> {
     let mut app = App::new();
     let events = EventHandler::new(150); // High tick rate for smooth animation
 
+    let aircraft_map = load_aircraft_csv("data/aircraft-database-complete-2025-08.csv");
+
     // Background API Poller
     let api_tx = events.tx.clone();
     tokio::spawn(async move {
         let provider = FlightProvider::new();
         loop {
             // Hardcoded SF coordinates for my specific needs -- i live in sf!
-            if let Ok(flights) = provider.fetch_overhead(37.77, -122.41).await {
+            if let Ok(mut flights) = provider.fetch_overhead(37.77, -122.41).await {
+                for flight in &mut flights {
+                    if let Some((op, ty)) = aircraft_map.get(&flight.icao24) {
+                        flight.operator = Some(op.clone());
+                        flight.aircraft_type = Some(ty.clone());
+                    }
+                }
                 let _ = api_tx.send(Event::FlightUpdate(flights));
             }
             tokio::time::sleep(Duration::from_secs(30)).await;

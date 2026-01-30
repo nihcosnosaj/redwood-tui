@@ -60,9 +60,13 @@ pub fn render(f: &mut Frame, app: &App) {
                 Span::styled(&fl.callsign, Style::default().fg(Color::Yellow)),
             ]),
             Line::from(format!("Origin:   {}", fl.origin_country)),
+            Line::from(format!("ICAO:     {}", fl.icao24)),
+            Line::from(format!("Airline:     {}", fl.operator.as_deref().unwrap_or("N/A"))),
+            Line::from(format!("Aircraft:     {}", fl.aircraft_type.as_deref().unwrap_or("N/A"))),
             Line::from(format!("Altitude: {:.0} m", fl.altitude)),
             Line::from(format!("Speed:    {:.0} km/h", fl.velocity)),
             Line::from(format!("Heading:  {:.0}°", fl.true_track)),
+            Line::from(format!("Vertical Rate: {:.0} m/s", fl.vertical_rate)),
         ];
         let p = Paragraph::new(details).block(
             Block::default()
