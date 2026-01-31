@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::error;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Flight {
     pub callsign: String,
     pub origin_country: String,
@@ -56,22 +56,23 @@ impl From<Vec<serde_json::Value>> for Flight {
 }
 
 impl Flight {
-    /// Calculates the distance in kilometers from the user's coordinates
-    /// to the aircraft's current position using the Haversine formula.
     pub fn distance_from(&self, user_lat: f64, user_lon: f64) -> f64 {
-        let r = 6371.0; // Earth's radius in KM
+        let r = 6371.0; // Earth's radius in km
 
-        let d_lat = (self.latitude - user_lat).to_radians();
-        let d_lon = (self.longitude - user_lon).to_radians();
+        // Convert everything to radians
+        let lat1 = user_lat.to_radians();
+        let lon1 = user_lon.to_radians();
+        let lat2 = self.latitude.to_radians();
+        let lon2 = self.longitude.to_radians();
 
-        let a = (d_lat / 2.0).sin().powi(2)
-            + user_lat.to_radians().cos()
-                * self.latitude.to_radians().cos()
-                * (d_lon / 2.0).sin().powi(2);
+        let d_lat = lat2 - lat1;
+        let d_lon = lon2 - lon1;
+
+        let a = (d_lat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (d_lon / 2.0).sin().powi(2);
 
         let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
-        r * c // Result in km
+        r * c
     }
 }
 
@@ -136,4 +137,37 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
         }
     }
     map
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_distance_calculation() {
+        let flight = Flight {
+            latitude: 37.7749, // San Francisco
+            longitude: -122.4194,
+            ..Default::default()
+        };
+
+        // 1. Test Identity (Distance to self = 0)
+        let dist = flight.distance_from(37.7749, -122.4194);
+        assert!(
+            dist < 0.01,
+            "Distance to self should be near zero, got {}",
+            dist
+        );
+
+        // 2. Test SF to Oakland (Approx 14km)
+        // Oakland Coords: 37.8044, -122.2712
+        let dist_oak = flight.distance_from(37.8044, -122.2712);
+
+        // Use a more realistic range or a delta check
+        assert!(
+            dist_oak > 13.0 && dist_oak < 15.0,
+            "SF to Oakland should be ~14km, got {:.2}km",
+            dist_oak
+        );
+    }
 }

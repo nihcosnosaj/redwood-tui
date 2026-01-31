@@ -22,8 +22,10 @@ impl FlightProvider {
         }
     }
 
-    pub async fn fetch_overhead(&self, lat: f64, lon: f64) -> Result<Vec<Flight>> {
-        let padding = 1.5; // Roughly covers a local metro area
+    pub async fn fetch_overhead(&self, lat: f64, lon: f64, radius_km: f64) -> Result<Vec<Flight>> {
+        // convert KM radius to approx decimal degree.
+        // 1 degree is roughly 111 KM
+        let padding = radius_km / 111.0;
         let url = format!(
             "https://opensky-network.org/api/states/all?lamin={}&lomin={}&lamax={}&lomax={}",
             lat - padding,

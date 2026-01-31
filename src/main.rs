@@ -4,7 +4,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use redwood_tui::{
     api::FlightProvider,
     app::{App, ViewMode},
-    db,
+    config, db,
     events::{Event, EventHandler},
     location, logging,
     models::load_aircraft_csv,
@@ -15,6 +15,7 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let config = redwood_tui::config::Config::load();
     let _log_guard = logging::initialize_logging();
     install_panic_hook();
     color_eyre::install()?;
@@ -23,18 +24,31 @@ async fn main() -> Result<()> {
 
     let mut terminal = setup_terminal()?;
     // Initialize app: get user coords, create eventhandler, etc.
-    let coords = location::get_current_location().await;
+    let coords = if config.location.auto_gpu {
+        redwood_tui::location::get_current_location().await
+    } else {
+        (config.location.manual_lat, config.location.manual_lon)
+    };
     let mut app = App::new();
     app.user_coords = coords;
     let events = EventHandler::new(150);
 
+    app.view_mode = match config.ui.default_view.as_str() {
+        "Dashboard" => ViewMode::Dashboard,
+        _ => ViewMode::Spotter,
+    };
+
     // Background API Poller
     let api_tx = events.tx.clone();
+    let poll_interval = config.api.poll_interval_seconds;
+    let radius = config.location.detection_radius;
+    let user_lat = coords.0;
+    let user_lon = coords.1;
     tokio::spawn(async move {
         let provider = FlightProvider::new();
         loop {
             // SF Coordinates
-            if let Ok(flights) = provider.fetch_overhead(coords.0, coords.1).await {
+            if let Ok(flights) = provider.fetch_overhead(user_lat, user_lon, radius).await {
                 // offload DB lookup to blocking thread
                 let enriched = tokio::task::spawn_blocking(move || db::decorate_flights(flights))
                     .await
@@ -48,7 +62,7 @@ async fn main() -> Result<()> {
                     timestamp: Instant::now(),
                 });
             }
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(poll_interval)).await;
         }
     });
 
