@@ -18,6 +18,10 @@ pub struct Flight {
     pub icao24: String,
     pub vertical_rate: f64,
     pub aircraft_type: Option<String>,
+    pub operator_callsign: Option<String>,
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub registration: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -40,10 +44,32 @@ impl From<Vec<serde_json::Value>> for Flight {
             origin_airport: None,
             destination_airport: None,
             operator: None,
-            aircraft_type: None,
             icao24: data[0].as_str().unwrap_or("N/A").trim().to_string(),
-            vertical_rate: data[11].as_f64().unwrap_or(0.0) as f64,
+            vertical_rate: data[11].as_f64().unwrap_or(0.0),
+            operator_callsign: None,
+            manufacturer: None,
+            model: None,
+            registration: None,
+            aircraft_type: None, 
         }
+    }
+}
+
+impl Flight {
+    /// Calculates the distance in kilometers from the user's coordinates
+    /// to the aircraft's current position using the Haversine formula.
+    pub fn distance_from(&self, user_lat: f64, user_lon: f64) -> f64 {
+        let r = 6371.0; // Earth's radius in KM
+
+        let d_lat = (self.latitude - user_lat).to_radians();
+        let d_lon = (self.longitude - user_lon).to_radians();
+
+        let a = (d_lat / 2.0).sin().powi(2)
+            + user_lat.to_radians().cos() * self.latitude.to_radians().cos() * (d_lon / 2.0).sin().powi(2);
+        
+        let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+        r * c // Result in km 
     }
 }
 
@@ -104,3 +130,4 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
     }
     map
 }
+

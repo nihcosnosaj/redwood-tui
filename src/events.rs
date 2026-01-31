@@ -6,7 +6,14 @@ use tokio::sync::mpsc;
 pub enum Event {
     Tick,
     Input(KeyEvent),
-    FlightUpdate(Vec<Flight>),
+    FlightUpdate{
+        flights: Vec<Flight>,
+        db_hits: usize,
+        timestamp: std::time::Instant,
+    },
+    DbProgress(f32),
+    DbDone,
+    DbError(String),
 }
 
 pub struct EventHandler {

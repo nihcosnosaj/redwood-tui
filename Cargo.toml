@@ -14,9 +14,15 @@ reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+# Geolocation
+ipgeolocate = "0.3"
+
 # Error handling and utils
 color-eyre = "0.6"
 chrono = "0.4.35"
+
+# SQLite
+rusqlite = { version = "0.31", features = ["bundled"]}
 
 # Logging and Observability
 tracing = "0.1"

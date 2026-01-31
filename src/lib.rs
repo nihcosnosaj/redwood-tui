@@ -4,3 +4,5 @@ pub mod events;
 pub mod logging;
 pub mod models;
 pub mod ui;
+pub mod db;
+pub mod location;

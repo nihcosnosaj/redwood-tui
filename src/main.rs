@@ -1,46 +1,54 @@
 use color_eyre::Result;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use crossterm::event::KeyCode;
 use redwood_tui::{
     api::FlightProvider,
-    app::App,
+    app::{App, ViewMode},
     events::{Event, EventHandler},
     logging,
+    location,
     models::load_aircraft_csv,
     ui,
+    db,
 };
-use std::{io, time::Duration};
+use std::{io, time::Duration, time::Instant};
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Instrumentation and safety
     let _log_guard = logging::initialize_logging();
     install_panic_hook();
     color_eyre::install()?;
 
     info!("Redwood TUI starting up...");
 
-    // Ready terminal and state
     let mut terminal = setup_terminal()?;
+    
+    // Initialize app: get user coords, create eventhandler, etc.
+    let coords = location::get_current_location().await;
     let mut app = App::new();
-    let events = EventHandler::new(150); // High tick rate for smooth animation
-
-    let aircraft_map = load_aircraft_csv("data/aircraft-database-complete-2025-08.csv");
+    app.user_coords = coords;
+    let events = EventHandler::new(150);
 
     // Background API Poller
     let api_tx = events.tx.clone();
     tokio::spawn(async move {
         let provider = FlightProvider::new();
         loop {
-            // Hardcoded SF coordinates for my specific needs -- i live in sf!
-            if let Ok(mut flights) = provider.fetch_overhead(37.77, -122.41).await {
-                for flight in &mut flights {
-                    if let Some((op, ty)) = aircraft_map.get(&flight.icao24) {
-                        flight.operator = Some(op.clone());
-                        flight.aircraft_type = Some(ty.clone());
-                    }
-                }
-                let _ = api_tx.send(Event::FlightUpdate(flights));
+            // SF Coordinates
+            if let Ok(flights) = provider.fetch_overhead(coords.0, coords.1).await {
+                // offload DB lookup to blocking thread
+                let enriched = tokio::task::spawn_blocking(move || {
+                    db::decorate_flights(flights)
+                }).await.unwrap_or_default();
+
+                let hits = enriched.iter().filter(|f| f.registration.is_some()).count();
+
+                let _ = api_tx.send(Event::FlightUpdate{
+                    flights: enriched,
+                    db_hits: hits,
+                    timestamp: Instant::now(),
+                });
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }
@@ -52,16 +60,39 @@ async fn main() -> Result<()> {
         terminal.draw(|f| ui::render(f, &app))?;
 
         if let Some(event) = event_handler.next().await {
-            match event {
+            match event {   
+                Event::Input(key) => {
+                    match key.code {
+                        KeyCode::Char('1') => app.view_mode = ViewMode::Dashboard,
+                        KeyCode::Char('2') => app.view_mode = ViewMode::Spotter,
+                        KeyCode::Char('q') => return Ok(()),
+                        _ => app.handle_key(key), // Pass other keys to app logic
+                    }
+                }
                 Event::Tick => app.on_tick(),
-                Event::Input(key) => app.handle_key(key),
-                Event::FlightUpdate(f) => app.flights = f,
+                Event::FlightUpdate { flights, db_hits, timestamp } => {
+                    if !app.is_initializing {
+                        let mut sorted = flights;
+                        let (u_lat, u_lon) = app.user_coords;
+                        
+                        // Sort nearest to farthest
+                        sorted.sort_by(|a, b| {
+                            a.distance_from(u_lat, u_lon)
+                                .partial_cmp(&b.distance_from(u_lat, u_lon))
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+
+                        app.flights = sorted;
+                        app.db_match_count = db_hits;
+                        app.last_update = Some(timestamp);
+                    }
+                }
+                _ => {}
             }
         }
     }
 
     restore_terminal(terminal)?;
-    info!("Redwood TUI shutting down.");
     Ok(())
 }
 
