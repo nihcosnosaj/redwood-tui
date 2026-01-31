@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
                     match key.code {
                         KeyCode::Char('1') => app.view_mode = ViewMode::Dashboard,
                         KeyCode::Char('2') => app.view_mode = ViewMode::Spotter,
-                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('q') => app.should_quit = true,
                         _ => app.handle_key(key), // Pass other keys to app logic
                     }
                 }
