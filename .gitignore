@@ -2,3 +2,4 @@
 /logs
 debug.log
 Cargo.lock
+*.db
