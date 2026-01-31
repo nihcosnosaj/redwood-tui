@@ -4,6 +4,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use redwood_tui::{
     api::FlightProvider,
     app::{App, ViewMode},
+    db,
     events::{Event, EventHandler},
     location, logging,
     models::load_aircraft_csv,
