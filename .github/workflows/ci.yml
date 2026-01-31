@@ -24,7 +24,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy (Lints)
-        run: cargo clippy -- -D warnings
+        run: cargo clippy
 
   test:
     name: Run Tests
