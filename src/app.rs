@@ -1,7 +1,7 @@
-use crate::models::Flight;
 use crate::events::Event;
-use std::sync::mpsc;
+use crate::models::Flight;
 use crossterm::event::{KeyCode, KeyEvent};
+use std::sync::mpsc;
 
 pub enum InitMessage {
     Progress(f32),
@@ -9,7 +9,7 @@ pub enum InitMessage {
     Error(String),
 }
 
-// Handles 
+// Handles
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ViewMode {
     Dashboard,
@@ -66,7 +66,7 @@ impl App {
             init_message: "Initializing database...".to_string(),
             init_rx,
             last_update: None,
-            db_match_count: 0
+            db_match_count: 0,
         }
     }
 
@@ -74,7 +74,7 @@ impl App {
         self.tick_count += 1;
 
         let mut should_cleanup = false;
-        
+
         // Catch messages from the DB worker
         if let Some(ref rx) = self.init_rx {
             while let Ok(event) = rx.try_recv() {
@@ -83,7 +83,7 @@ impl App {
                     Event::DbDone => {
                         self.is_initializing = false;
                         should_cleanup = true;
-                    },
+                    }
                     Event::DbError(e) => {
                         self.init_message = e;
                         should_cleanup = true;
@@ -100,7 +100,9 @@ impl App {
     pub fn handle_key(&mut self, key: KeyEvent) {
         // Prevent navigation while initializing to avoid data races or confusion
         if self.is_initializing {
-            if let KeyCode::Char('q') = key.code { self.should_quit = true; }
+            if let KeyCode::Char('q') = key.code {
+                self.should_quit = true;
+            }
             return;
         }
 

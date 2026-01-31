@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 pub enum Event {
     Tick,
     Input(KeyEvent),
-    FlightUpdate{
+    FlightUpdate {
         flights: Vec<Flight>,
         db_hits: usize,
         timestamp: std::time::Instant,

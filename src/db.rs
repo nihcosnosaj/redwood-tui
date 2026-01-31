@@ -1,8 +1,8 @@
 use crate::events::Event;
 use rusqlite::{params, Connection, OpenFlags};
-use std::sync::mpsc::Sender;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::BufReader;
+use std::sync::mpsc::Sender;
 
 pub fn init_database(tx: Sender<Event>) {
     std::thread::spawn(move || {
@@ -32,14 +32,16 @@ pub fn init_database(tx: Sender<Event>) {
                 owner TEXT,
                 registration TEXT,
                 typecode TEXT
-            )", [],
-        ).unwrap();
+            )",
+            [],
+        )
+        .unwrap();
 
         // Map Headers
         let mut rdr = csv::ReaderBuilder::new()
-                    .quote(b'\'') 
-                    .has_headers(true)
-                    .from_reader(BufReader::new(file));
+            .quote(b'\'')
+            .has_headers(true)
+            .from_reader(BufReader::new(file));
 
         let headers = match rdr.headers() {
             Ok(h) => h.clone(),
@@ -59,37 +61,37 @@ pub fn init_database(tx: Sender<Event>) {
             Some(i) => i,
             None => {
                 let _ = tx.send(Event::DbError(format!(
-                    "CSV Error: Could not find 'icao24' column. Found: {:?}", 
+                    "CSV Error: Could not find 'icao24' column. Found: {:?}",
                     headers
                 )));
                 return; // Exit thread gracefully instead of panicking
             }
         };
-        let idx_mfr  = find_col("manufacturername");
-        let idx_mod  = find_col("model");
+        let idx_mfr = find_col("manufacturername");
+        let idx_mod = find_col("model");
         let idx_oper = find_col("operator");
         let idx_call = find_col("operatorcallsign");
-        let idx_own  = find_col("owner");
-        let idx_reg  = find_col("registration");
+        let idx_own = find_col("owner");
+        let idx_reg = find_col("registration");
         let idx_type = find_col("typecode");
 
         // Bulk Insert
         let db_tx = conn.unchecked_transaction().unwrap();
         {
-            let mut stmt = db_tx.prepare(
-                "INSERT OR REPLACE INTO aircraft VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            ).unwrap();
+            let mut stmt = db_tx
+                .prepare("INSERT OR REPLACE INTO aircraft VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+                .unwrap();
 
             for (i, result) in rdr.records().enumerate() {
                 let record = result.unwrap();
                 bytes_processed += record.as_slice().len();
 
-            let clean = |idx: Option<usize>| {
-                idx.and_then(|i| record.get(i))
-                    .map(|s| s.trim_matches(|c| c == '\'' || c == '"').trim()) 
-                    .unwrap_or("")
-                    .to_string()
-            };
+                let clean = |idx: Option<usize>| {
+                    idx.and_then(|i| record.get(i))
+                        .map(|s| s.trim_matches(|c| c == '\'' || c == '"').trim())
+                        .unwrap_or("")
+                        .to_string()
+                };
 
                 let _ = stmt.execute(params![
                     clean(Some(idx_icao)).to_lowercase(),
@@ -114,7 +116,7 @@ pub fn init_database(tx: Sender<Event>) {
 
 pub fn decorate_flights(mut flights: Vec<crate::models::Flight>) -> Vec<crate::models::Flight> {
     let db_path = "opensky_aircraft.db";
-    
+
     // If DB doesn't exist yet, just return the raw flights
     if !std::path::Path::new(db_path).exists() {
         return flights;
@@ -125,14 +127,16 @@ pub fn decorate_flights(mut flights: Vec<crate::models::Flight>) -> Vec<crate::m
         Err(_) => return flights,
     };
 
-    let mut stmt = conn.prepare(
-        "SELECT manufacturerName, model, operator, operatorCallsign, registration, typecode 
-         FROM aircraft WHERE icao24 = ?"
-    ).unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT manufacturerName, model, operator, operatorCallsign, registration, typecode 
+        FROM aircraft WHERE icao24 = ?",
+        )
+        .unwrap();
 
     for flight in &mut flights {
         let icao = flight.icao24.trim().to_lowercase();
-        
+
         let details = stmt.query_row([&icao], |row| {
             Ok((
                 row.get::<_, String>(0)?, // manufacturer

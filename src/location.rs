@@ -1,5 +1,5 @@
 use ipgeolocate::{Locator, Service};
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub async fn get_current_location() -> (f64, f64) {
     // Using IpApi as the service, it's pretty reliable.
@@ -12,7 +12,10 @@ pub async fn get_current_location() -> (f64, f64) {
         }
         Err(e) => {
             // Use SF as a default if lookup fails.
-            error!("Error using geolocation service: {}. Using San Francisco as default area.", e);
+            error!(
+                "Error using geolocation service: {}. Using San Francisco as default area.",
+                e
+            );
             (37.7749, -122.4194)
         }
     }

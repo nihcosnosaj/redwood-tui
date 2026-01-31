@@ -1,6 +1,6 @@
+use csv::ReaderBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use csv::ReaderBuilder;
 use tracing::error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ impl From<Vec<serde_json::Value>> for Flight {
             manufacturer: None,
             model: None,
             registration: None,
-            aircraft_type: None, 
+            aircraft_type: None,
         }
     }
 }
@@ -65,20 +65,19 @@ impl Flight {
         let d_lon = (self.longitude - user_lon).to_radians();
 
         let a = (d_lat / 2.0).sin().powi(2)
-            + user_lat.to_radians().cos() * self.latitude.to_radians().cos() * (d_lon / 2.0).sin().powi(2);
-        
+            + user_lat.to_radians().cos()
+                * self.latitude.to_radians().cos()
+                * (d_lon / 2.0).sin().powi(2);
+
         let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
-        r * c // Result in km 
+        r * c // Result in km
     }
 }
 
 pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
     let mut map = HashMap::new();
-    let mut rdr = match ReaderBuilder::new()
-        .quote(b'\'')
-        .from_path(path) 
-    {
+    let mut rdr = match ReaderBuilder::new().quote(b'\'').from_path(path) {
         Ok(r) => r,
         Err(e) => {
             error!("Failed to load aircraft database from '{}': {}", path, e);
@@ -112,7 +111,12 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
 
     for result in rdr.records() {
         if let Ok(record) = result {
-            let icao24 = record.get(icao24_idx).unwrap_or("").trim_matches('\'').trim().to_lowercase();
+            let icao24 = record
+                .get(icao24_idx)
+                .unwrap_or("")
+                .trim_matches('\'')
+                .trim()
+                .to_lowercase();
 
             let get_val = |idx: Option<usize>| {
                 idx.and_then(|i| record.get(i))
@@ -120,7 +124,10 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
                     .filter(|s| !s.is_empty())
             };
 
-            let operator = get_val(operator_idx).or_else(|| get_val(owner_idx)).unwrap_or("").to_string();
+            let operator = get_val(operator_idx)
+                .or_else(|| get_val(owner_idx))
+                .unwrap_or("")
+                .to_string();
             let manufacturer = get_val(manufacturer_idx).unwrap_or("");
             let model = get_val(model_idx).unwrap_or("");
             let aircraft_type = format!("{} {}", manufacturer, model).trim().to_string();
@@ -130,4 +137,3 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
     }
     map
 }
-

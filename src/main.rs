@@ -1,15 +1,13 @@
 use color_eyre::Result;
-use ratatui::{backend::CrosstermBackend, Terminal};
 use crossterm::event::KeyCode;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use redwood_tui::{
     api::FlightProvider,
     app::{App, ViewMode},
     events::{Event, EventHandler},
-    logging,
-    location,
+    location, logging,
     models::load_aircraft_csv,
     ui,
-    db,
 };
 use std::{io, time::Duration, time::Instant};
 use tracing::info;
@@ -23,7 +21,6 @@ async fn main() -> Result<()> {
     info!("Redwood TUI starting up...");
 
     let mut terminal = setup_terminal()?;
-    
     // Initialize app: get user coords, create eventhandler, etc.
     let coords = location::get_current_location().await;
     let mut app = App::new();
@@ -38,13 +35,13 @@ async fn main() -> Result<()> {
             // SF Coordinates
             if let Ok(flights) = provider.fetch_overhead(coords.0, coords.1).await {
                 // offload DB lookup to blocking thread
-                let enriched = tokio::task::spawn_blocking(move || {
-                    db::decorate_flights(flights)
-                }).await.unwrap_or_default();
+                let enriched = tokio::task::spawn_blocking(move || db::decorate_flights(flights))
+                    .await
+                    .unwrap_or_default();
 
                 let hits = enriched.iter().filter(|f| f.registration.is_some()).count();
 
-                let _ = api_tx.send(Event::FlightUpdate{
+                let _ = api_tx.send(Event::FlightUpdate {
                     flights: enriched,
                     db_hits: hits,
                     timestamp: Instant::now(),
@@ -60,7 +57,7 @@ async fn main() -> Result<()> {
         terminal.draw(|f| ui::render(f, &app))?;
 
         if let Some(event) = event_handler.next().await {
-            match event {   
+            match event {
                 Event::Input(key) => {
                     match key.code {
                         KeyCode::Char('1') => app.view_mode = ViewMode::Dashboard,
@@ -70,11 +67,14 @@ async fn main() -> Result<()> {
                     }
                 }
                 Event::Tick => app.on_tick(),
-                Event::FlightUpdate { flights, db_hits, timestamp } => {
+                Event::FlightUpdate {
+                    flights,
+                    db_hits,
+                    timestamp,
+                } => {
                     if !app.is_initializing {
                         let mut sorted = flights;
                         let (u_lat, u_lon) = app.user_coords;
-                        
                         // Sort nearest to farthest
                         sorted.sort_by(|a, b| {
                             a.distance_from(u_lat, u_lon)
