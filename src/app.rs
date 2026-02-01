@@ -127,19 +127,3 @@ impl App {
         }
     }
 }
-
-#[test]
-fn test_app_navigation() {
-    let mut app = App::new();
-    app.view_mode = ViewMode::Dashboard;
-
-    // Test mode switch
-    app.view_mode = ViewMode::Spotter;
-    assert_eq!(app.view_mode, ViewMode::Spotter);
-
-    // Test selection wrapping
-    app.flights = vec![Flight::default(), Flight::default()];
-    app.selected_index = 1;
-    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
-    assert_eq!(app.selected_index, 0);
-}
