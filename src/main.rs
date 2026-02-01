@@ -48,19 +48,32 @@ async fn main() -> Result<()> {
         let provider = FlightProvider::new();
         loop {
             // SF Coordinates
-            if let Ok(flights) = provider.fetch_overhead(user_lat, user_lon, radius).await {
-                // offload DB lookup to blocking thread
-                let enriched = tokio::task::spawn_blocking(move || db::decorate_flights(flights))
-                    .await
-                    .unwrap_or_default();
+            match provider.fetch_overhead(user_lat, user_lon, radius).await {
+                Ok(flights) => {
+                    // offload DB lookup to blocking thread
+                    let enriched =
+                        tokio::task::spawn_blocking(move || db::decorate_flights(flights))
+                            .await
+                            .unwrap_or_default();
 
-                let hits = enriched.iter().filter(|f| f.registration.is_some()).count();
+                    let hits = enriched.iter().filter(|f| f.registration.is_some()).count();
 
-                let _ = api_tx.send(Event::FlightUpdate {
-                    flights: enriched,
-                    db_hits: hits,
-                    timestamp: Instant::now(),
-                });
+                    let _ = api_tx.send(Event::FlightUpdate {
+                        flights: enriched,
+                        db_hits: hits,
+                        timestamp: Instant::now(),
+                        is_success: true,
+                    });
+                }
+                Err(e) => {
+                    tracing::error!("API Fetch failed: {}", e);
+                    let _ = api_tx.send(Event::FlightUpdate {
+                        flights: Vec::new(),
+                        db_hits: 0,
+                        timestamp: std::time::Instant::now(),
+                        is_success: false,
+                    });
+                }
             }
             tokio::time::sleep(Duration::from_secs(poll_interval)).await;
         }
@@ -86,8 +99,10 @@ async fn main() -> Result<()> {
                     flights,
                     db_hits,
                     timestamp,
+                    is_success,
                 } => {
                     if !app.is_initializing {
+                        app.last_update_success = is_success;
                         let mut sorted = flights;
                         let (u_lat, u_lon) = app.user_coords;
                         // Sort nearest to farthest
@@ -97,9 +112,11 @@ async fn main() -> Result<()> {
                                 .unwrap_or(std::cmp::Ordering::Equal)
                         });
 
-                        app.flights = sorted;
-                        app.db_match_count = db_hits;
-                        app.last_update = Some(timestamp);
+                        if is_success {
+                            app.flights = sorted;
+                            app.db_match_count = db_hits;
+                            app.last_update = Some(timestamp);
+                        }
                     }
                 }
                 _ => {}

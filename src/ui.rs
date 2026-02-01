@@ -301,6 +301,19 @@ fn render_settings_view(f: &mut Frame, _app: &App) {
     );
 }
 
+fn render_api_status(f: &mut Frame, app: &App, area: Rect) {
+    let (status_text, color) = match app.last_update_success {
+        true => (" ● ONLINE ", Color::Green),
+        false => (" ● RATE LIMITED / OFFLINE ", Color::Red),
+    };
+
+    let status = Paragraph::new(status_text)
+        .style(Style::default().fg(color))
+        .alignment(Alignment::Right);
+
+    f.render_widget(status, area);
+}
+
 /// Brand Identity via Colors
 fn get_operator_color(operator: &str) -> Color {
     let op = operator.to_lowercase();

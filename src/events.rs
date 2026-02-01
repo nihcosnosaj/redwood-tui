@@ -10,6 +10,7 @@ pub enum Event {
         flights: Vec<Flight>,
         db_hits: usize,
         timestamp: std::time::Instant,
+        is_success: bool,
     },
     DbProgress(f32),
     DbDone,

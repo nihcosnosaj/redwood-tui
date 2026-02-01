@@ -40,6 +40,7 @@ pub struct App {
 
     // System Telemetry info
     pub last_update: Option<std::time::Instant>,
+    pub last_update_success: bool,
     pub db_match_count: usize,
 }
 
@@ -67,6 +68,7 @@ impl App {
             init_rx,
             last_update: None,
             db_match_count: 0,
+            last_update_success: false,
         }
     }
 
