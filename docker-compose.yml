@@ -1,0 +1,9 @@
+services:
+  redwood:
+    build: .
+    image: redwood-tui:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/app/data
+      - ./config.toml:/app/config.toml

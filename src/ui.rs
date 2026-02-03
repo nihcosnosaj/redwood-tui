@@ -1,6 +1,22 @@
+//! TUI rendering for the Redwood TUI
+//!
+//! This module handles all UI rendering logic using the `ratatui` crate,
+//! including dashboard views, spotter views, loading screens, and settings.
+
 use crate::app::{App, ViewMode};
 use ratatui::{prelude::*, widgets::*};
 
+/// Renders one frame of the TUI based on current application state.
+///
+/// If the app is still initializing the aircraft database, draws the loading
+/// screen (progress gauge and message). Otherwise selects the view from
+/// [`App::view_mode`]: dashboard (list + detail + telemetry), spotter
+/// (focused aircraft ID), or settings placeholder.
+///
+/// # Arguments
+///
+/// * `f` - The ratatui frame to draw into (from `terminal.draw()`).
+/// * `app` - Current application state (flights, selection, view mode, etc.).
 pub fn render(f: &mut Frame, app: &App) {
     if app.is_initializing {
         render_loading_screen(f, app);
@@ -14,6 +30,17 @@ pub fn render(f: &mut Frame, app: &App) {
     }
 }
 
+/// Dashboard view: flight list sidebar (30%) + main area (70%).
+///
+/// The main area is split into a fixed-height telemetry block and a details
+/// paragraph. Shows "Flights Nearby" list, system telemetry (network, latency,
+/// DB hits, selected ICAO, enriched vs raw), and detailed identity/telemetry
+/// for the selected flight.
+///
+/// # Arguments
+///
+/// * `f` - The ratatui frame to draw into (from `terminal.draw()`).
+/// * `app` - Current application state (flights, selection, view mode, etc.).
 fn render_dashboard_view(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -206,6 +233,16 @@ fn render_dashboard_view(f: &mut Frame, app: &App) {
     }
 }
 
+/// Spotter view: centered aircraft identity with operator, callsign, model.
+///
+/// Uses 20% / 60% / 20% vertical chunks. The middle chunk shows the selected
+/// flight's operator (styled), callsign (inverse), and model. The bottom
+/// chunk shows altitude, velocity, and heading.
+///
+/// # Arguments
+///
+/// * `f` - The ratatui frame to draw into (from `terminal.draw()`).
+/// * `app` - Current application state (flights, selection, view mode, etc.).
 fn render_spotter_view(f: &mut Frame, app: &App) {
     let area = f.size();
 
@@ -254,7 +291,11 @@ fn render_spotter_view(f: &mut Frame, app: &App) {
     }
 }
 
-/// Renders the first-run database initialization screen
+/// Renders the first-run database initialization screen.
+///
+/// Shows a centered progress gauge (from `app.init_progress`, 0.0–1.0) and
+/// the status message (`app.init_message`). Used when `app.is_initializing`
+/// is true.
 fn render_loading_screen(f: &mut Frame, app: &App) {
     let area = f.size();
     let chunks = Layout::default()
@@ -283,6 +324,10 @@ fn render_loading_screen(f: &mut Frame, app: &App) {
     f.render_widget(msg, chunks[2]);
 }
 
+/// Placeholder settings view.
+///
+/// Renders a centered "Settings" block with short instructions. Config
+/// options are not yet implemented.
 fn render_settings_view(f: &mut Frame, _app: &App) {
     let block = Block::default()
         .title(" Settings ")
@@ -301,6 +346,11 @@ fn render_settings_view(f: &mut Frame, _app: &App) {
     );
 }
 
+/// Renders API status (online vs rate limited/offline) into the given area.
+///
+/// Uses green "● ONLINE" when `app.last_update_success` is true, red
+/// "● RATE LIMITED / OFFLINE" otherwise. Right-aligned. Currently unused
+/// but available for a header or status bar.
 fn render_api_status(f: &mut Frame, app: &App, area: Rect) {
     let (status_text, color) = match app.last_update_success {
         true => (" ● ONLINE ", Color::Green),
@@ -314,7 +364,10 @@ fn render_api_status(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(status, area);
 }
 
-/// Brand Identity via Colors
+/// Returns a color associated with the operator name for brand-style display.
+///
+/// Matches common US airlines and cargo operators by substring (case-insensitive).
+/// Unknown operators return [`Color::White`].
 fn get_operator_color(operator: &str) -> Color {
     let op = operator.to_lowercase();
     if op.contains("united") {

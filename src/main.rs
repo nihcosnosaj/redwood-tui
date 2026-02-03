@@ -1,3 +1,8 @@
+//! Main entry point for the Redwood TUI application.
+//!
+//! This module initializes the application, sets up the terminal,
+//! creates the event handler, and starts the background API poller.
+//! It also handles user input and updates the application state.
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -13,6 +18,29 @@ use redwood_tui::{
 use std::{io, time::Duration, time::Instant};
 use tracing::info;
 
+/// Application entry point.
+///
+/// 1. **Startup**: Load config, initialize logging, install panic hook and
+///    color_eyre. Set up the terminal for TUI mode.
+/// 2. **Location**: Use IP geolocation or manual config for user coordinates.
+/// 3. **App & events**: Create [`App`] and an [`EventHandler`] (tick rate 150 ms).
+/// 4. **Background poller**: Spawn a task that periodically fetches flights
+///    from OpenSky, enriches them via the local DB, and sends
+///    [`Event::FlightUpdate`] on the event channel.
+/// 5. **Main loop**: Draw the UI, then block on the next event. Handle input
+///    (view switch, quit, delegate to [`App::handle_key`]), ticks
+///    ([`App::on_tick`]), and flight updates (sort by distance, update app state).
+/// 6. **Shutdown**: Restore terminal and exit.
+///
+/// # Errors
+///
+/// Returns an error if terminal setup/restore fails or if color_eyre
+/// installation fails.
+///
+/// # Panics
+///
+/// Does not panic; a custom panic hook ensures the terminal is restored
+/// before the default panic handler runs.
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = redwood_tui::config::Config::load();
@@ -128,6 +156,19 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Puts the terminal into TUI-friendly mode.
+///
+/// Enables raw mode (no line buffering, key-by-key input), switches to the
+/// alternate screen buffer, and hides the cursor. Must be paired with
+/// [`restore_terminal`] on exit so the user's shell is left in a usable state.
+///
+/// # Errors
+///
+/// Returns an error if any of the crossterm operations fail.
+///
+/// # Panics
+///
+/// Does not panic.
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -139,6 +180,18 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
 }
 
+/// Restores the terminal to normal behavior.
+///
+/// Disables raw mode, leaves the alternate screen, and shows the cursor.
+/// Should be called on normal exit and is also invoked by the panic hook.
+///
+/// # Errors
+///
+/// Returns an error if any of the crossterm operations fail.
+///
+/// # Panics
+///
+/// Does not panic.
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(
@@ -149,6 +202,17 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
+/// Installs a custom panic hook that restores the terminal before panicking.
+///
+/// For a TUI, a panic would otherwise leave the terminal in raw mode and the
+/// alternate screen active, which makes the shell hard to use. This hook
+/// runs the same cleanup as [`restore_terminal`] (best effort, ignoring
+/// errors), then invokes the original panic handler.
+///
+/// # Panics
+///
+/// Does not panic. Must be called early in [`main`] so it is in place before
+/// any other code can panic.
 fn install_panic_hook() {
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {

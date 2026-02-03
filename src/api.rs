@@ -1,7 +1,15 @@
+//! API client for the Redwood TUI
+//!
+//! This module handles all API calls to the OpenSky Network,
+//! including fetching aircraft data and decorating it with
+//! additional information from the aircraft database.
+
 use crate::models::{Flight, OpenSkyResponse};
 use color_eyre::Result;
 use reqwest::Client;
 
+/// This struct manages HTTP client config and handles
+/// fetching real-time flight data within a specified geographic radius.
 pub struct FlightProvider {
     client: Client,
 }

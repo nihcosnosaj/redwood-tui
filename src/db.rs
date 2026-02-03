@@ -1,9 +1,43 @@
+//! SQLite aircraft database and enrichment for the Redwood flight tracker.
+//!
+//! This module provides:
+//! - **[`init_database`]** — Builds `opensky_aircraft.db` from the aircraft CSV on a
+//!   background thread, sending [`Event::DbProgress`], [`Event::DbDone`], or
+//!   [`Event::DbError`] so the UI can show first-run progress.
+//! - **[`decorate_flights`]** — Looks up each flight by ICAO24 in the DB and fills
+//!   in manufacturer, model, operator, registration, etc. Intended to be called
+//!   from a blocking task (e.g. `spawn_blocking`) to avoid blocking the async runtime.
+
 use crate::events::Event;
 use rusqlite::{params, Connection, OpenFlags};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::mpsc::Sender;
 
+/// Builds the aircraft SQLite database from the CSV and notifies via `tx`.
+///
+/// Spawns a blocking thread that:
+/// 1. Opens `data/aircraft-database-complete-2025-08.csv` (sends [`Event::DbError`] on failure).
+/// 2. Creates or opens `opensky_aircraft.db` and the `aircraft` table (icao24, manufacturerName,
+///    model, operator, operatorCallsign, owner, registration, typecode).
+/// 3. Maps CSV columns case-insensitively (handles BOM), requires `icao24`.
+/// 4. Inserts all rows in a single transaction; every 2000 rows sends [`Event::DbProgress`]
+///    with progress in 0.0–1.0 (by bytes read).
+/// 5. On success sends [`Event::DbDone`]; on CSV/header/column errors sends [`Event::DbError`].
+///
+/// The caller (e.g. [`App::new`](crate::app::App::new)) should pass the sending half of an
+/// `mpsc::channel` and receive these events on the main thread (e.g. in [`App::on_tick`](crate::app::App::on_tick)).
+///
+/// # Arguments
+///
+/// * `tx` - Sender for progress/done/error events; consumed by the spawned thread.
+///
+/// # Panics
+///
+/// The spawned thread may panic on SQLite or CSV read errors (e.g. `file.metadata()`,
+/// `Connection::open`, `prepare`, `stmt.execute`, `commit`). CSV record parse
+/// failures also panic via `result.unwrap()`. Errors that are reported via
+/// `Event::DbError` do not panic.
 pub fn init_database(tx: Sender<Event>) {
     std::thread::spawn(move || {
         let db_path = "opensky_aircraft.db";
@@ -114,10 +148,32 @@ pub fn init_database(tx: Sender<Event>) {
     });
 }
 
+/// Enriches flights with aircraft identity data from the local SQLite database.
+///
+/// For each flight, looks up `opensky_aircraft.db` by ICAO24 (lowercase) and
+/// fills in `manufacturer`, `model`, `operator`, `operator_callsign`,
+/// `registration`, and `aircraft_type`. If the DB does not exist (e.g. before
+/// first-run init completes) or cannot be opened read-only, returns the
+/// input list unchanged. Missing or failed lookups leave those fields as-is.
+///
+/// Designed to be run from a blocking context (e.g. `tokio::task::spawn_blocking`)
+/// so that SQLite I/O does not block the async runtime.
+///
+/// # Arguments
+///
+/// * `flights` - Flights from the API; modified in place and returned.
+///
+/// # Returns
+///
+/// The same vector with identity fields populated where the DB has a matching row.
+///
+/// # Panics
+///
+/// May panic if the DB connection or prepared statement fails (e.g. schema
+/// mismatch). Does not panic on missing DB or missing row for a given ICAO24.
 pub fn decorate_flights(mut flights: Vec<crate::models::Flight>) -> Vec<crate::models::Flight> {
     let db_path = "opensky_aircraft.db";
 
-    // If DB doesn't exist yet, just return the raw flights
     if !std::path::Path::new(db_path).exists() {
         return flights;
     }

@@ -1,36 +1,95 @@
+//! Data models and parsing for the Redwood flight tracker.
+//!
+//! This module defines:
+//! - **[`Flight`]** — A single aircraft’s state (position, identity, telemetry), populated from
+//!   the OpenSky API and optionally enriched by the local aircraft database.
+//! - **[`OpenSkyResponse`]** — Raw JSON response shape from the OpenSky “states” API.
+//! - **Conversion** from OpenSky’s state-vector format into [`Flight`] via [`From`].
+//! - **[`load_aircraft_csv`]** — Builds a lookup map (ICAO24 → operator/type) from the
+//!   aircraft CSV; the DB layer uses this data when building the SQLite DB.
+
 use csv::ReaderBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::error;
 
+/// A single aircraft’s current state and identity.
+///
+/// Core fields come from the [OpenSky state vector](https://opensky-network.org/docs/api/v1.html#response)
+/// (e.g. position, altitude, velocity). Optional fields are filled when the
+/// aircraft is found in the local aircraft database (see `db::decorate_flights`).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Flight {
+    /// Flight or operator callsign (e.g. "UAL123")
     pub callsign: String,
+    /// Country of registration/origin.
     pub origin_country: String,
+    /// Longitude in decimal degrees.
     pub longitude: f64,
+    /// Latitude in decimal degrees.
     pub latitude: f64,
+    /// Altitude in meters.
     pub altitude: f32,
+    /// Velocity in meters per second.
     pub velocity: f32,
+    /// True track in degrees.
     pub true_track: f32,
+    /// Origin airport (ICAO code).
     pub origin_airport: Option<String>,
+    /// Destination airport (ICAO code).
     pub destination_airport: Option<String>,
+    /// Operator (e.g. "United Airlines").
     pub operator: Option<String>,
+    /// ICAO24 aircraft identifier.
     pub icao24: String,
+    /// Vertical rate in meters per second.
     pub vertical_rate: f64,
+    /// Aircraft type (e.g. "Boeing 747").
     pub aircraft_type: Option<String>,
+    /// Operator callsign (e.g. "UAL").
     pub operator_callsign: Option<String>,
+    /// Manufacturer (e.g. "Boeing").
     pub manufacturer: Option<String>,
+    /// Model (e.g. "747").
     pub model: Option<String>,
+    /// Registration (e.g. "N12345").
     pub registration: Option<String>,
 }
 
+/// Raw response from the OpenSky Network “states/all” (or bounding-box) API.
+///
+/// `states` is an optional array of state vectors. Each vector is an array of
+/// [`serde_json::Value`]s whose indices follow the [OpenSky state vector format](https://opensky-network.org/docs/api/v1.html#response).
 #[derive(Deserialize)]
 pub struct OpenSkyResponse {
     pub states: Option<Vec<Vec<serde_json::Value>>>,
 }
 
-// Unmarshal the vector JSON Response from API call to OpenSky
-// into an instance of Flight.
+/// Builds a [`Flight`] from a single OpenSky state vector.
+///
+/// Indices follow the [OpenSky API state vector](https://opensky-network.org/docs/api/v1.html#response):
+/// 0 = icao24, 1 = callsign, 2 = origin_country, 5 = longitude, 6 = latitude,
+/// 7 = altitude, 9 = velocity, 10 = true_track, 11 = vertical_rate. Fields not
+/// provided by the API (operator, registration, etc.) are set to `None` and
+/// can be filled later by `db::decorate_flights`.
+///
+/// # Panics
+///
+/// Does not panic; missing or invalid values use defaults (e.g. 0.0 for numbers,
+/// "N/A" or "Unknown" for strings).
+///
+/// # Arguments
+///
+/// * `data` - A vector of [`serde_json::Value`]s representing the OpenSky state vector.
+///
+/// # Returns
+///
+/// A [`Flight`] struct populated with the data from the OpenSky state vector.
+///
+/// # Panics
+///
+/// Does not panic; missing or invalid values use defaults (e.g. 0.0 for numbers,
+/// "N/A" or "Unknown" for strings).
 impl From<Vec<serde_json::Value>> for Flight {
     fn from(data: Vec<serde_json::Value>) -> Self {
         Self {
@@ -56,6 +115,19 @@ impl From<Vec<serde_json::Value>> for Flight {
 }
 
 impl Flight {
+    /// Great-circle distance from this flight's position to a point.
+    ///
+    /// Uses the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula)
+    /// with Earth's radius 6371 km. Suitable for "nearby" distances.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_lat` - Observer latitude in decimal degrees.
+    /// * `user_lon` - Observer longitude in decimal degrees.
+    ///
+    /// # Returns
+    ///
+    /// Distance in kilometers.
     pub fn distance_from(&self, user_lat: f64, user_lon: f64) -> f64 {
         let r = 6371.0; // Earth's radius in km
 
@@ -76,6 +148,22 @@ impl Flight {
     }
 }
 
+/// Loads the aircraft CSV into a map keyed by ICAO24.
+///
+/// Expects a CSV with single-quoted fields and headers including `icao24`.
+/// Optional columns (matched case-insensitively): `operator`, `owner`,
+/// `manufacturername`, `model`. Operator is taken from `operator` or `owner`.
+/// The value is `(operator, aircraft_type)` where `aircraft_type` is
+/// `"manufacturer model"` (trimmed).
+///
+/// # Arguments
+///
+/// * `path` - Path to the CSV file (e.g. `data/aircraft-database-complete-2025-08.csv`).
+///
+/// # Returns
+///
+/// A map from lowercase ICAO24 string to `(operator, aircraft_type)`.
+/// On open/parse errors or missing `icao24` header, logs and returns an empty map.
 pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
     let mut map = HashMap::new();
     let mut rdr = match ReaderBuilder::new().quote(b'\'').from_path(path) {
