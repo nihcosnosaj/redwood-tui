@@ -59,10 +59,12 @@ async fn main() -> Result<()> {
     };
     let mut app = App::new();
     app.user_coords = coords;
+    app.config = config.clone();
     let events = EventHandler::new(150);
 
     app.view_mode = match config.ui.default_view.as_str() {
         "Dashboard" => ViewMode::Dashboard,
+        "Settings" => ViewMode::Settings,
         _ => ViewMode::Spotter,
     };
 
@@ -118,6 +120,7 @@ async fn main() -> Result<()> {
                     match key.code {
                         KeyCode::Char('1') => app.view_mode = ViewMode::Dashboard,
                         KeyCode::Char('2') => app.view_mode = ViewMode::Spotter,
+                        KeyCode::Char('3') => app.view_mode = ViewMode::Settings,
                         KeyCode::Char('q') => app.should_quit = true,
                         _ => app.handle_key(key), // Pass other keys to app logic
                     }

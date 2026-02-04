@@ -5,9 +5,10 @@
 //! user input and periodic tick updates. It coordinates with the main event loop
 //! in `main.rs` and the database intialization worker in `db.rs`.
 
+use crate::config::Config;
 use crate::events::Event;
 use crate::models::Flight;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use std::sync::mpsc;
 
 /// Messages sent during first-run DB initialization.
@@ -81,6 +82,13 @@ pub struct App {
     pub last_update_success: bool,
     /// Number of flights in the current set that were enriched with DB data.
     pub db_match_count: usize,
+
+    /// Loaded configuration; used by Settings view and saved to config.toml on Save.
+    pub config: Config,
+    /// Index of the selected setting row in the Settings view (0..=5).
+    pub settings_selected_index: usize,
+    /// Brief message shown in Settings after save (e.g. "Config saved.").
+    pub settings_message: Option<String>,
 }
 
 impl App {
@@ -118,6 +126,9 @@ impl App {
             last_update: None,
             db_match_count: 0,
             last_update_success: false,
+            config: Config::default(),
+            settings_selected_index: 0,
+            settings_message: None,
         }
     }
 
@@ -175,6 +186,11 @@ impl App {
             return;
         }
 
+        if self.view_mode == ViewMode::Settings {
+            self.handle_settings_key(key);
+            return;
+        }
+
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Down | KeyCode::Char('j') => {
@@ -189,6 +205,107 @@ impl App {
                         .checked_sub(1)
                         .unwrap_or(self.flights.len() - 1);
                 }
+            }
+            _ => {}
+        }
+    }
+
+    const SETTINGS_FIELD_COUNT: usize = 6;
+
+    /// Handles key input when the Settings view is active.
+    fn handle_settings_key(&mut self, key: KeyEvent) {
+        use KeyCode::*;
+        self.settings_message = None;
+
+        match key.code {
+            Up | Char('k') => {
+                self.settings_selected_index = self
+                    .settings_selected_index
+                    .checked_sub(1)
+                    .unwrap_or(Self::SETTINGS_FIELD_COUNT - 1);
+            }
+            Down | Char('j') => {
+                self.settings_selected_index =
+                    (self.settings_selected_index + 1) % Self::SETTINGS_FIELD_COUNT;
+            }
+            Char('s') => {
+                if let Err(e) = self.config.save() {
+                    self.settings_message = Some(format!("Save failed: {}", e));
+                } else {
+                    self.settings_message =
+                        Some("Config saved. Restart for poll/radius changes.".to_string());
+                    self.user_coords = if self.config.location.auto_gpu {
+                        self.user_coords
+                    } else {
+                        (
+                            self.config.location.manual_lat,
+                            self.config.location.manual_lon,
+                        )
+                    };
+                    self.view_mode = match self.config.ui.default_view.as_str() {
+                        "Dashboard" => ViewMode::Dashboard,
+                        "Settings" => ViewMode::Settings,
+                        _ => ViewMode::Spotter,
+                    };
+                }
+            }
+            Enter | Char(' ') => match self.settings_selected_index {
+                0 => self.config.location.auto_gpu = !self.config.location.auto_gpu,
+                5 => {
+                    self.config.ui.default_view = match self.config.ui.default_view.as_str() {
+                        "Dashboard" => "Spotter".to_string(),
+                        "Spotter" => "Settings".to_string(),
+                        _ => "Dashboard".to_string(),
+                    };
+                }
+                _ => {}
+            },
+            Char('+') | Char('=') => self.settings_increment(),
+            Char('-') => self.settings_decrement(),
+            _ => {}
+        }
+    }
+
+    fn settings_increment(&mut self) {
+        match self.settings_selected_index {
+            1 => {
+                self.config.location.manual_lat = (self.config.location.manual_lat + 0.1).min(90.0)
+            }
+            2 => {
+                self.config.location.manual_lon = (self.config.location.manual_lon + 0.1).min(180.0)
+            }
+            3 => {
+                self.config.location.detection_radius =
+                    (self.config.location.detection_radius + 5.0).min(500.0)
+            }
+            4 => {
+                self.config.api.poll_interval_seconds =
+                    (self.config.api.poll_interval_seconds + 5).min(600)
+            }
+            _ => {}
+        }
+    }
+
+    fn settings_decrement(&mut self) {
+        match self.settings_selected_index {
+            1 => {
+                self.config.location.manual_lat = (self.config.location.manual_lat - 0.1).max(-90.0)
+            }
+            2 => {
+                self.config.location.manual_lon =
+                    (self.config.location.manual_lon - 0.1).max(-180.0)
+            }
+            3 => {
+                self.config.location.detection_radius =
+                    (self.config.location.detection_radius - 5.0).max(1.0)
+            }
+            4 => {
+                self.config.api.poll_interval_seconds = self
+                    .config
+                    .api
+                    .poll_interval_seconds
+                    .saturating_sub(5)
+                    .max(5)
             }
             _ => {}
         }

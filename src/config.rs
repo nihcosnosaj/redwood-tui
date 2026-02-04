@@ -123,4 +123,16 @@ impl Config {
         info!("Loaded default configuration.");
         default_config
     }
+
+    /// Writes the current configuration to `config.toml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization or writing to disk fails.
+    pub fn save(&self) -> std::io::Result<()> {
+        let toml_string = toml::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        fs::write(CONFIG_PATH, toml_string)?;
+        Ok(())
+    }
 }

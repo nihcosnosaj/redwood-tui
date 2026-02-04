@@ -324,26 +324,95 @@ fn render_loading_screen(f: &mut Frame, app: &App) {
     f.render_widget(msg, chunks[2]);
 }
 
-/// Placeholder settings view.
-///
-/// Renders a centered "Settings" block with short instructions. Config
-/// options are not yet implemented.
-fn render_settings_view(f: &mut Frame, _app: &App) {
+/// Settings view: displays config and allows editing with ↑/↓, Enter/Space, +/-.
+fn render_settings_view(f: &mut Frame, app: &App) {
+    let area = f.size();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(10),
+            Constraint::Length(2),
+            Constraint::Length(1),
+        ])
+        .split(area);
+
+    let title = Paragraph::new(" Settings ")
+        .style(Style::default().add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center);
+    f.render_widget(title, chunks[0]);
+
+    let c = &app.config;
+    let sel = app.settings_selected_index;
+    let rows: [(usize, &str, String); 6] = [
+        (
+            0,
+            "Use IP geolocation     ",
+            if c.location.auto_gpu { "Yes" } else { "No" }.to_string(),
+        ),
+        (
+            1,
+            "Manual latitude        ",
+            format!("{:.4}", c.location.manual_lat),
+        ),
+        (
+            2,
+            "Manual longitude       ",
+            format!("{:.4}", c.location.manual_lon),
+        ),
+        (
+            3,
+            "Detection radius (km)  ",
+            format!("{:.0}", c.location.detection_radius),
+        ),
+        (
+            4,
+            "Poll interval (s)      ",
+            c.api.poll_interval_seconds.to_string(),
+        ),
+        (5, "Default view          ", c.ui.default_view.clone()),
+    ];
+    let items: Vec<Line> = rows
+        .iter()
+        .map(|(idx, label, value)| {
+            let style = if *idx == sel {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .bg(Color::Rgb(30, 30, 60))
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            Line::from(vec![
+                Span::styled(format!("  {} ", label), style),
+                Span::styled(value.as_str(), style),
+            ])
+        })
+        .collect();
+
     let block = Block::default()
-        .title(" Settings ")
+        .title(" config.toml ")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
-    let text = vec![
-        Line::from("Config options coming soon..."),
-        Line::from("Press '1' for Dashboard, '2' for Spotter"),
-    ];
+    let inner = block.inner(chunks[1]);
+    f.render_widget(block, chunks[1]);
 
-    f.render_widget(
-        Paragraph::new(text)
-            .block(block)
-            .alignment(Alignment::Center),
-        f.size(),
-    );
+    let list = Paragraph::new(items).alignment(Alignment::Left);
+    f.render_widget(list, inner);
+
+    let help = Paragraph::new(vec![
+        Line::from(" ↑/↓ select   Enter/Space toggle or cycle   +/- change number   s Save   q back  1/2/3 views"),
+    ])
+    .style(Style::default().fg(Color::DarkGray))
+    .alignment(Alignment::Center);
+    f.render_widget(help, chunks[2]);
+
+    if let Some(ref msg) = app.settings_message {
+        let p = Paragraph::new(msg.as_str())
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center);
+        f.render_widget(p, chunks[3]);
+    }
 }
 
 /// Renders API status (online vs rate limited/offline) into the given area.

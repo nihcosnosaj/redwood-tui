@@ -1,11 +1,11 @@
 [location]
-auto_gpu = false
+auto_gpu = true
 manual_lat = 37.7749
 manual_lon = -122.4194
-detection_radius = 50.0
+detection_radius = 45.0
 
 [api]
-poll_interval_seconds = 30
+poll_interval_seconds = 25
 
 [ui]
-default_view = "Dashboard"
+default_view = "Spotter"
