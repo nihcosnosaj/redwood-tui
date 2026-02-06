@@ -73,11 +73,6 @@ pub struct OpenSkyResponse {
 /// provided by the API (operator, registration, etc.) are set to `None` and
 /// can be filled later by `db::decorate_flights`.
 ///
-/// # Panics
-///
-/// Does not panic; missing or invalid values use defaults (e.g. 0.0 for numbers,
-/// "N/A" or "Unknown" for strings).
-///
 /// # Arguments
 ///
 /// * `data` - A vector of [`serde_json::Value`]s representing the OpenSky state vector.
