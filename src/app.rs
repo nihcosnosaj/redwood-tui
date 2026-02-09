@@ -31,20 +31,17 @@ pub enum InitMessage {
 /// - Dashboard: a list of nearby flights with basic info
 /// - Spotter: a detailed view of the selected flight
 /// - Settings: a screen for configuring app settings (not implemented yet)
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub enum ViewMode {
+    #[default]
     /// Dashboard: flight list sidebar plus detail and telemetry panel.
     Dashboard,
+    /// Radar: view of aircraft tracked on a rudimentary map
+    Radar,
     /// Spotter: detailed view of the selected flight.
     Spotter,
     /// Settings: screen for configuring app settings (not implemented yet).
     Settings,
-}
-
-impl Default for ViewMode {
-    fn default() -> Self {
-        ViewMode::Dashboard
-    }
 }
 
 /// Main application state and controller.
@@ -89,6 +86,8 @@ pub struct App {
     pub settings_selected_index: usize,
     /// Brief message shown in Settings after save (e.g. "Config saved.").
     pub settings_message: Option<String>,
+    /// region we are tracking.
+    pub tracking_region: String,
 }
 
 impl App {
@@ -129,6 +128,7 @@ impl App {
             config: Config::default(),
             settings_selected_index: 0,
             settings_message: None,
+            tracking_region: "Unknown".to_string(),
         }
     }
 

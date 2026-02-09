@@ -12,7 +12,7 @@ use tracing::{info, warn};
 const CONFIG_PATH: &str = "config.toml";
 
 /// Root configuration structure; maps to the top level of `config.toml`.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     /// Location and detection radius settings.
     pub location: LocationConfig,
@@ -73,16 +73,6 @@ impl Default for UiConfig {
     fn default() -> Self {
         Self {
             default_view: "Dashboard".to_string(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            location: LocationConfig::default(),
-            api: ApiConfig::default(),
-            ui: UiConfig::default(),
         }
     }
 }

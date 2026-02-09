@@ -26,6 +26,7 @@ use tracing::{error, info};
 /// Does not panic. Parse failures for latitude/longitude from the response
 /// fall back to the same San Francisco default as on service error.
 pub async fn get_current_location() -> (f64, f64) {
+    tracing::info!("Attempting IP geolocation...");
     // Using IpApi as the service, it's pretty reliable.
     match Locator::get("1.1.1.1", Service::IpApi).await {
         Ok(loc) => {

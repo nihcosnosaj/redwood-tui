@@ -193,31 +193,30 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
     let manufacturer_idx = find_col("manufacturername");
     let model_idx = find_col("model");
 
-    for result in rdr.records() {
-        if let Ok(record) = result {
-            let icao24 = record
-                .get(icao24_idx)
-                .unwrap_or("")
-                .trim_matches('\'')
-                .trim()
-                .to_lowercase();
+    for record in rdr.records().flatten() {
+        let icao24 = record
+            .get(icao24_idx)
+            .unwrap_or("")
+            .trim_matches('\'')
+            .trim()
+            .to_lowercase();
 
-            let get_val = |idx: Option<usize>| {
-                idx.and_then(|i| record.get(i))
-                    .map(|s| s.trim_matches('\'').trim())
-                    .filter(|s| !s.is_empty())
-            };
+        let get_val = |idx: Option<usize>| {
+            idx.and_then(|i| record.get(i))
+                .map(|s| s.trim_matches('\'').trim())
+                .filter(|s| !s.is_empty())
+        };
 
-            let operator = get_val(operator_idx)
-                .or_else(|| get_val(owner_idx))
-                .unwrap_or("")
-                .to_string();
-            let manufacturer = get_val(manufacturer_idx).unwrap_or("");
-            let model = get_val(model_idx).unwrap_or("");
-            let aircraft_type = format!("{} {}", manufacturer, model).trim().to_string();
+        let operator = get_val(operator_idx)
+            .or_else(|| get_val(owner_idx))
+            .unwrap_or("")
+            .to_string();
+            
+        let manufacturer = get_val(manufacturer_idx).unwrap_or("");
+        let model = get_val(model_idx).unwrap_or("");
+        let aircraft_type = format!("{} {}", manufacturer, model).trim().to_string();
 
-            map.insert(icao24, (operator, aircraft_type));
-        }
+        map.insert(icao24, (operator, aircraft_type));
     }
     map
 }

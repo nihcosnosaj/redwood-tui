@@ -9,10 +9,9 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use redwood_tui::{
     api::FlightProvider,
     app::{App, ViewMode},
-    config, db,
+    db,
     events::{Event, EventHandler},
-    location, logging,
-    models::load_aircraft_csv,
+    logging,
     ui,
 };
 use std::{io, time::Duration, time::Instant};
@@ -60,6 +59,7 @@ async fn main() -> Result<()> {
     let mut app = App::new();
     app.user_coords = coords;
     app.config = config.clone();
+    app.tracking_region = format!("LAT: {:.2}, LON: {:.2}", coords.0, coords.1);
     let events = EventHandler::new(150);
 
     app.view_mode = match config.ui.default_view.as_str() {
@@ -120,7 +120,8 @@ async fn main() -> Result<()> {
                     match key.code {
                         KeyCode::Char('1') => app.view_mode = ViewMode::Dashboard,
                         KeyCode::Char('2') => app.view_mode = ViewMode::Spotter,
-                        KeyCode::Char('3') => app.view_mode = ViewMode::Settings,
+                        KeyCode::Char('3') => app.view_mode = ViewMode::Radar,
+                        KeyCode::Char('4') => app.view_mode = ViewMode::Settings,
                         KeyCode::Char('q') => app.should_quit = true,
                         _ => app.handle_key(key), // Pass other keys to app logic
                     }

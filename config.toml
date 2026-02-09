@@ -1,5 +1,5 @@
 [location]
-auto_gpu = true
+auto_gpu = false
 manual_lat = 37.7749
 manual_lon = -122.4194
 detection_radius = 45.0

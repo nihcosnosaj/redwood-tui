@@ -4,7 +4,12 @@
 //! including dashboard views, spotter views, loading screens, and settings.
 
 use crate::app::{App, ViewMode};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+    prelude::*,
+    widgets::{canvas::*, *}, // Imports Points, Circle, Map, etc.
+};
+
+use ratatui::text::Line;
 
 /// Renders one frame of the TUI based on current application state.
 ///
@@ -27,6 +32,7 @@ pub fn render(f: &mut Frame, app: &App) {
         ViewMode::Dashboard => render_dashboard_view(f, app),
         ViewMode::Spotter => render_spotter_view(f, app),
         ViewMode::Settings => render_settings_view(f, app),
+        ViewMode::Radar => render_radar_view(f, app),
     }
 }
 
@@ -144,6 +150,13 @@ fn render_dashboard_view(f: &mut Frame, app: &App) {
                     "RAW DATA"
                 }),
             ]),
+            Line::from(vec![
+                Span::styled("  BASE: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(&app.tracking_region, Style::default().fg(Color::Magenta)),
+                Span::raw("  │  "),
+                Span::styled("RANGE: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(format!("{}km", app.config.location.detection_radius)),
+            ]),
         ];
 
         let stats_block = Paragraph::new(stats_content)
@@ -231,6 +244,97 @@ fn render_dashboard_view(f: &mut Frame, app: &App) {
         );
         f.render_widget(p, main_chunks[1]);
     }
+}
+
+fn render_radar_view(f: &mut Frame, app: &App) {
+    let area = f.size();
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
+        .split(area);
+
+    draw_flight_sidebar(f, app, chunks[0]);
+
+    let (u_lat, u_lon) = app.user_coords;
+    let radius = 1.0; // Your zoom level
+
+    let radar_canvas = Canvas::default()
+        .block(Block::bordered().title(" Precision Radar "))
+        .marker(symbols::Marker::Braille)
+        .x_bounds([u_lon - radius, u_lon + radius])
+        .y_bounds([u_lat - radius, u_lat + radius])
+        .paint(|ctx| {
+            // --- 1. Landmass Outlines ---
+            ctx.draw(&Map {
+                color: Color::Rgb(50, 50, 50),   // Dark grey for a "tactical" look
+                resolution: MapResolution::High, // Uses high-res coastline data
+            });
+
+            // --- 2. Orientation Markers (N, S, E, W) ---
+            let label_style = Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM);
+
+            // North
+            ctx.print(
+                u_lon,
+                u_lat + (radius * 0.9),
+                Line::from(Span::styled("N", label_style)),
+            );
+            // South
+            ctx.print(
+                u_lon,
+                u_lat - (radius * 0.9),
+                Line::from(Span::styled("S", label_style)),
+            );
+            // East
+            ctx.print(
+                u_lon + (radius * 0.9),
+                u_lat,
+                Line::from(Span::styled("E", label_style)),
+            );
+            // West
+            ctx.print(
+                u_lon - (radius * 0.9),
+                u_lat,
+                Line::from(Span::styled("W", label_style)),
+            );
+
+            // --- 3. Aircraft Rendering ---
+            for (i, flight) in app.flights.iter().enumerate() {
+                let is_selected = i == app.selected_index;
+
+                if is_selected {
+                    ctx.print(
+                        flight.longitude,
+                        flight.latitude,
+                        Line::from(vec![
+                            Span::styled(
+                                " ✈ ",
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                format!(" {} ", flight.callsign),
+                                Style::default().fg(Color::Black).bg(Color::Yellow),
+                            ),
+                        ]),
+                    );
+                } else {
+                    ctx.print(flight.longitude, flight.latitude, "·");
+                }
+            }
+
+            // --- 4. Home Crosshair ---
+            ctx.print(
+                u_lon,
+                u_lat,
+                Line::from(Span::styled(" ⌖ ", Style::default().fg(Color::Cyan))),
+            );
+        });
+
+    f.render_widget(radar_canvas, chunks[1]);
 }
 
 /// Spotter view: centered aircraft identity with operator, callsign, model.
@@ -415,22 +519,26 @@ fn render_settings_view(f: &mut Frame, app: &App) {
     }
 }
 
-/// Renders API status (online vs rate limited/offline) into the given area.
-///
-/// Uses green "● ONLINE" when `app.last_update_success` is true, red
-/// "● RATE LIMITED / OFFLINE" otherwise. Right-aligned. Currently unused
-/// but available for a header or status bar.
-fn render_api_status(f: &mut Frame, app: &App, area: Rect) {
-    let (status_text, color) = match app.last_update_success {
-        true => (" ● ONLINE ", Color::Green),
-        false => (" ● RATE LIMITED / OFFLINE ", Color::Red),
-    };
+fn draw_flight_sidebar(f: &mut Frame, app: &App, area: Rect) {
+    let items: Vec<ListItem> = app
+        .flights
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let style = if Some(i) == Some(app.selected_index) {
+                Style::default().fg(Color::Black).bg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            ListItem::new(format!(" > {}", f.callsign)).style(style)
+        })
+        .collect();
 
-    let status = Paragraph::new(status_text)
-        .style(Style::default().fg(color))
-        .alignment(Alignment::Right);
+    let list = List::new(items)
+        .block(Block::bordered().title("Flights"))
+        .highlight_symbol(">> ");
 
-    f.render_widget(status, area);
+    f.render_widget(list, area);
 }
 
 /// Returns a color associated with the operator name for brand-style display.
