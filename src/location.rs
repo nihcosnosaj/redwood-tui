@@ -6,8 +6,8 @@
 //! default coordinates on failure.
 
 use ipgeolocate::{Locator, Service};
-use tracing::{error, info, info_span, instrument, warn};
 use tracing::Instrument;
+use tracing::{error, info, info_span, instrument, warn};
 
 const FALLBACK_COORDS: (f64, f64) = (37.7749, -122.4194);
 
@@ -37,7 +37,7 @@ pub async fn get_current_location() -> (f64, f64) {
 
     async move {
         info!("initalizing automated geolocation request");
-        match Locator::get("", Service::IpApi).await {  
+        match Locator::get("", Service::IpApi).await {
             Ok(loc) => {
                 let lat = loc.latitude.parse::<f64>();
                 let lon = loc.longitude.parse::<f64>();
@@ -45,9 +45,9 @@ pub async fn get_current_location() -> (f64, f64) {
                 match (lat, lon) {
                     (Ok(la), Ok(lo)) => {
                         info!(
-                            lat = la, 
-                            lon = lo, 
-                            city = %loc.city, 
+                            lat = la,
+                            lon = lo,
+                            city = %loc.city,
                             region = %loc.region,
                             "geolocation resolution successful"
                         );
@@ -55,8 +55,8 @@ pub async fn get_current_location() -> (f64, f64) {
                     }
                     _ => {
                         warn!(
-                            raw_lat = %loc.latitude, 
-                            raw_lon = %loc.longitude, 
+                            raw_lat = %loc.latitude,
+                            raw_lon = %loc.longitude,
                             "failed to parse coordinate strings; using fallback"
                         );
                         FALLBACK_COORDS
@@ -65,7 +65,7 @@ pub async fn get_current_location() -> (f64, f64) {
             }
             Err(e) => {
                 error!(
-                    error = %e, 
+                    error = %e,
                     "geolocation service unavailable; check network connectivity or API rate limits"
                 );
                 FALLBACK_COORDS

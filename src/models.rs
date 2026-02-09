@@ -211,7 +211,7 @@ pub fn load_aircraft_csv(path: &str) -> HashMap<String, (String, String)> {
             .or_else(|| get_val(owner_idx))
             .unwrap_or("")
             .to_string();
-            
+
         let manufacturer = get_val(manufacturer_idx).unwrap_or("");
         let model = get_val(model_idx).unwrap_or("");
         let aircraft_type = format!("{} {}", manufacturer, model).trim().to_string();

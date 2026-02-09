@@ -11,8 +11,7 @@ use redwood_tui::{
     app::{App, ViewMode},
     db,
     events::{Event, EventHandler},
-    logging,
-    ui,
+    logging, ui,
 };
 use std::{io, time::Duration, time::Instant};
 use tracing::info;
