@@ -264,13 +264,13 @@ fn render_radar_view(f: &mut Frame, app: &App) {
         .x_bounds([u_lon - radius, u_lon + radius])
         .y_bounds([u_lat - radius, u_lat + radius])
         .paint(|ctx| {
-            // --- 1. Landmass Outlines ---
+            // Landmass Outlines 
             ctx.draw(&Map {
                 color: Color::Rgb(50, 50, 50),   // Dark grey for a "tactical" look
                 resolution: MapResolution::High, // Uses high-res coastline data
             });
 
-            // --- 2. Orientation Markers (N, S, E, W) ---
+            // Orientation Markers (N, S, E, W)
             let label_style = Style::default()
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::DIM);
@@ -300,7 +300,7 @@ fn render_radar_view(f: &mut Frame, app: &App) {
                 Line::from(Span::styled("W", label_style)),
             );
 
-            // --- 3. Aircraft Rendering ---
+            // Aircraft Rendering 
             for (i, flight) in app.flights.iter().enumerate() {
                 let is_selected = i == app.selected_index;
 
